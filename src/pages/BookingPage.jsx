@@ -36,9 +36,12 @@ const getEvent = async (id) => {
   }
 
   try {
-    const response = await axios.get("http://localhost:3000/api/get-event", {
-      params: { id },
-    });
+    const response = await axios.get(
+      `${import.meta.env.VITE_API_BASE_URL}/get-event`,
+      {
+        params: { id },
+      }
+    );
     console.log("API Response:", response.data);
     return response.data;
   } catch (error) {
