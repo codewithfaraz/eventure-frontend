@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button, Input, Modal } from "rizzui";
+import { useUser } from "@clerk/clerk-react";
 import BookingPageSkeleton from "../Skeleton/BookingPageSkeleton";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
 import axios from "axios";
 import { FiMinus, FiPlus, FiCalendar, FiMapPin, FiTag } from "react-icons/fi";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import CheckoutForm from "../components/CheckoutForm";
 const getCategoryColor = (category) => {
   if (!category) return "bg-gray-100 text-gray-800";
 
@@ -17,6 +21,7 @@ const getCategoryColor = (category) => {
 
   return "bg-indigo-100 text-indigo-800";
 };
+
 const IMAGES = {
   music:
     "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80",
@@ -27,6 +32,17 @@ const IMAGES = {
     "https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?q=80&w=3072&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   sports:
     "https://plus.unsplash.com/premium_photo-1684820878202-52781d8e0ea9?q=80&w=3871&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+};
+const addBooking = async (bookingData) => {
+  console.log("booking data", bookingData);
+  const response = await axios.post(
+    `${import.meta.env.VITE_API_BASE_URL}/add-booking`,
+    {
+      ...bookingData,
+    }
+  );
+  console.log("Booking API Response:", response.data);
+  return response.data;
 };
 const getEvent = async (id) => {
   console.log("getEvent called with ID:", id);
@@ -51,9 +67,18 @@ const getEvent = async (id) => {
 };
 
 function BookingPage() {
+  const { user } = useUser();
+  const stripePromise = loadStripe(
+    "pk_test_51RCuzmCl0vn8AzTFhopPduTWVQlYArGSJl9TU0yEMRrCltDmOukj0oj4tObkzOw4PMfjgbEK6LU7yhlDEyUX5dnx00GXqqwZN5"
+  ); // Use your publishable key
+  const addEventMutation = useMutation({
+    mutationFn: (bookingData) => addBooking(bookingData),
+    onSuccess: (data) => console.log("Booking successful:", data),
+    onError: (error) => console.error("Booking error:", error),
+  });
   const { eventId } = useParams();
   const navigate = useNavigate();
-
+  const [isCheckoutForm, setIsCheckoutForm] = useState(false);
   // Form state
   const [ticketCount, setTicketCount] = useState(1);
   const [name, setName] = useState("");
@@ -175,21 +200,36 @@ function BookingPage() {
     if (validateForm()) {
       const bookingDetails = {
         name,
-        email,
+        email: user.emailAddresses[0].emailAddress,
         quantity: ticketCount,
         totalPrice,
         eventId: event.id,
         eventTitle: event.title,
       };
-
       console.log("Booking Details for API:", bookingDetails);
-      setIsThankYouModalOpen(true);
+      setIsCheckoutForm(true);
+      // setIsThankYouModalOpen(true);
     }
   };
 
   const handleCloseModal = () => {
     setIsThankYouModalOpen(false);
     navigate("/");
+  };
+  const handlePaymebntSuccess = () => {
+    console.log("Payment successful");
+    const bookingDetails = {
+      name,
+      email: user.emailAddresses[0].emailAddress,
+      quantity: ticketCount,
+      totalPrice,
+      eventId,
+      eventTitle: event.title,
+    };
+    console.log("Booking Details for API:", bookingDetails);
+    addEventMutation.mutate(bookingDetails);
+    setIsCheckoutForm(false);
+    setIsThankYouModalOpen(true);
   };
   const categoryColorClass = getCategoryColor(event.selectedCategory["value"]);
   return (
@@ -358,6 +398,20 @@ function BookingPage() {
                     </p>
                   )}
                 </div>
+                <Modal
+                  size="lg"
+                  isOpen={isCheckoutForm}
+                  onClose={() => setIsCheckoutForm(false)}
+                >
+                  <div>
+                    <Elements stripe={stripePromise}>
+                      <CheckoutForm
+                        totalPrice={Number(totalPrice)}
+                        onSuccess={handlePaymebntSuccess}
+                      />
+                    </Elements>
+                  </div>
+                </Modal>
               </div>
 
               <Button

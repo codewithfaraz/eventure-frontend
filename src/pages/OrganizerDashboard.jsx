@@ -13,7 +13,16 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { eventData } from "../data/mockData";
 import { useUser } from "@clerk/clerk-react";
-import { FiEdit, FiTrash2, FiPlus } from "react-icons/fi";
+import {
+  FiEdit,
+  FiTrash2,
+  FiPlus,
+  FiX,
+  FiTag,
+  FiCalendar,
+  FiMapPin,
+  FiDollarSign,
+} from "react-icons/fi";
 import EventTableSkeleton from "../Skeleton/EventTableSkeleton";
 import ErrorState from "../components/ErrorState";
 import EventsNotFoundState from "../components/EventsNotFoundState";
@@ -35,8 +44,20 @@ const getEvents = async (email) => {
       },
     }
   );
-  console.log(response.data.data);
   return response.data;
+};
+const getBookings = async (email) => {
+  console.log(email);
+  const response = await axios.get(
+    `${import.meta.env.VITE_API_BASE_URL}/get-bookings`,
+    {
+      params: {
+        email: email,
+      },
+    }
+  );
+
+  return response.data.bookings;
 };
 const deleteEvent = async (id) => {
   console.log(id);
@@ -80,38 +101,7 @@ function OrganizerDashboard() {
   const [activeTab, setActiveTab] = useState("events");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isBookingDetailOpen, setIsBookingDetailOpen] = useState(false);
-  const [bookings, setBookings] = useState([
-    {
-      id: 1,
-      eventId: 2,
-      eventTitle: "Tech Conference 2023",
-      date: "2023-09-22",
-      location: "Convention Center, San Francisco",
-      price: "299.99",
-      status: "Confirmed",
-      ticketType: "VIP Pass",
-    },
-    {
-      id: 2,
-      eventId: 5,
-      eventTitle: "Art Exhibition: Modern Masters",
-      date: "2023-08-15",
-      location: "Metropolitan Gallery, Los Angeles",
-      price: "35.00",
-      status: "Pending",
-      ticketType: "General Admission",
-    },
-    {
-      id: 3,
-      eventId: 3,
-      eventTitle: "Food & Wine Festival",
-      date: "2023-08-10",
-      location: "Riverside Gardens, Chicago",
-      price: "89.99",
-      status: "Confirmed",
-      ticketType: "Premium Pass",
-    },
-  ]);
+
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -137,6 +127,18 @@ function OrganizerDashboard() {
     queryKey: ["events", user.emailAddresses[0].emailAddress],
     enabled: !!user?.emailAddresses?.[0]?.emailAddress,
   });
+  const {
+    data: allBookingsData,
+    isLoading: allBookingsLoading,
+    error: allBookingsError,
+  } = useQuery({
+    queryFn: () => getBookings(user.emailAddresses[0].emailAddress),
+    queryKey: ["allBookings"],
+    enabled: !!user?.emailAddresses?.[0]?.emailAddress,
+  });
+  if (!allBookingsLoading) {
+    console.log(allBookingsData);
+  }
   const updateEventMutation = useMutation({
     mutationFn: (data) => updateEvent(data),
     onSuccess: () => {
@@ -251,12 +253,11 @@ function OrganizerDashboard() {
       });
     }
   };
-
+  if (allBookingsError) {
+    console.log(allBookingsError);
+  }
   const viewBookingDetails = (booking) => {
-    // Find the full event data based on the eventId in the booking
-    const eventDetails =
-      eventData.find((event) => event.id === booking.eventId) || {};
-    setSelectedBooking({ ...booking, eventDetails });
+    setSelectedBooking({ ...booking });
     setIsBookingDetailOpen(true);
   };
   return (
@@ -413,7 +414,7 @@ function OrganizerDashboard() {
                         Price
                       </th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
-                        Status
+                        Quantity
                       </th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">
                         Actions
@@ -421,40 +422,43 @@ function OrganizerDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bookings.slice(0, 10).map((booking) => (
-                      <tr key={booking.id} className="border-t">
-                        <td className="px-4 py-3 text-sm font-medium">
-                          {booking.eventTitle}
-                        </td>
-                        <td className="px-4 py-3 text-sm">{booking.date}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {booking.location}
-                        </td>
-                        <td className="px-4 py-3 text-sm">${booking.price}</td>
-                        <td className="px-4 py-3 text-sm">
-                          <Badge
-                            variant="flat"
-                            color={
-                              booking.status === "Confirmed"
-                                ? "success"
-                                : "warning"
-                            }
-                          >
-                            {booking.status}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-purple-600 text-purple-600 hover:bg-purple-50"
-                            onClick={() => viewBookingDetails(booking)}
-                          >
-                            View Details
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                    {allBookingsLoading ? (
+                      <EventTableSkeleton />
+                    ) : allBookingsError ? (
+                      <ErrorState type="bookings" />
+                    ) : allBookingsData && allBookingsData.length > 0 ? (
+                      allBookingsData.map((event) => (
+                        <tr key={event._id} className="border-t">
+                          <td className="px-4 py-3 text-sm font-medium">
+                            {event.eventTitle}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {event.eventId.date}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {event.eventId.location}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            ${event.totalPrice}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <Badge variant="flat">{event.quantity}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-purple-600 text-purple-600 hover:bg-purple-50"
+                              onClick={() => viewBookingDetails(event)}
+                            >
+                              View Details
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <EventsNotFoundState type="bookings" />
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -694,7 +698,9 @@ function OrganizerDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Date</p>
-                    <p className="font-medium">{selectedBooking.date}</p>
+                    <p className="font-medium">
+                      {selectedBooking.eventId.date}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -703,7 +709,9 @@ function OrganizerDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Location</p>
-                    <p className="font-medium">{selectedBooking.location}</p>
+                    <p className="font-medium">
+                      {selectedBooking.eventId.location}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -712,7 +720,7 @@ function OrganizerDashboard() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Price</p>
-                    <p className="font-medium">${selectedBooking.price}</p>
+                    <p className="font-medium">${selectedBooking.totalPrice}</p>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -720,8 +728,9 @@ function OrganizerDashboard() {
                     <FiTag className="text-purple-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Ticket Type</p>
-                    <p className="font-medium">{selectedBooking.ticketType}</p>
+                    <p className="font-medium">
+                      {selectedBooking.eventId.selectedCategory.label}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -729,29 +738,21 @@ function OrganizerDashboard() {
 
             <div className="mb-6">
               <h4 className="font-semibold text-lg mb-2">Booking Status</h4>
-              <Badge
-                size="lg"
-                variant="flat"
-                color={
-                  selectedBooking.status === "Confirmed" ? "success" : "warning"
-                }
-                className="text-base py-2 px-4"
-              >
-                {selectedBooking.status}
+              <Badge size="lg" variant="flat">
+                Confirmed
               </Badge>
             </div>
 
-            {selectedBooking.eventDetails &&
-              selectedBooking.eventDetails.description && (
-                <div className="mb-6">
-                  <h4 className="font-semibold text-lg mb-2">
-                    Event Description
-                  </h4>
-                  <p className="text-gray-600">
-                    {selectedBooking.eventDetails.description}
-                  </p>
-                </div>
-              )}
+            {selectedBooking && (
+              <div className="mb-6">
+                <h4 className="font-semibold text-lg mb-2">
+                  Event Description
+                </h4>
+                <p className="text-gray-600">
+                  {selectedBooking.eventId.description}
+                </p>
+              </div>
+            )}
 
             <div className="flex justify-end">
               <Button
