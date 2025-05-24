@@ -50,10 +50,11 @@ const getUpcomingEvents = async () => {
 };
 
 const categories = [
-  { name: "Music", icon: <FiMusic size={24} /> },
-  { name: "Technology", icon: <FiCode size={24} /> },
-  { name: "Food & Drink", icon: <FiCoffee size={24} /> },
-  { name: "Health", icon: <FiHeart size={24} /> },
+  { label: "Music", value: "music" },
+  { label: "Technology", value: "technology" },
+  { label: "Food & Drink", value: "food" },
+  { label: "Health", value: "health" },
+  { label: "Sports", value: "sports" },
 ];
 const howItWorks = [
   {
@@ -113,14 +114,11 @@ function HomePage() {
   const [modalTitle, setModalTitle] = useState("");
 
   // Format categories for MultiSelect
-  const categoryOptions = categories.map((category) => ({
-    value: category.name.toLowerCase(),
-    label: category.name,
-  }));
-  const handleBrowseEvents = () => {
-    setModalTitle("Browse All Events");
-    setIsModalOpen(true);
-  };
+  // const categoryOptions = categories.map((category) => ({
+  //   value: category.name.toLowerCase(),
+  //   label: category.name,
+  // }));
+
   const {
     data: alleventsData,
     isLoading: alleventsDataIsLoading,
@@ -129,13 +127,36 @@ function HomePage() {
     queryFn: getAllEvents,
     queryKey: ["all_OfTheEvents"],
   });
+  const handleBrowseEvents = () => {
+    setModalTitle("Browse All Events");
+    setSelectedCategories([]);
+    setSelectedDate("");
+    setSelectedLocation("");
+    setFilteredEvents(alleventsData || []);
+    setIsModalOpen(true);
+  };
   useEffect(() => {
     setFilteredEvents(alleventsData);
-  });
+  }, [alleventsData]);
   // Handle search with filters
   const handleSearchEvents = () => {
     setModalTitle("Search Results");
-
+    let filtered = alleventsData || [];
+    if (selectedCategories.length > 0) {
+      console.log(selectedDate);
+      filtered = filtered.filter((event) => {
+        return selectedCategories.includes(event.selectedCategory.value);
+      });
+    }
+    if (selectedDate !== "") {
+      filtered = filtered.filter((event) => selectedDate === event.date);
+    }
+    if (selectedLocation.length > 0) {
+      filtered = filtered.filter((event) =>
+        event.location.toLowerCase().includes(selectedLocation.toLowerCase())
+      );
+    }
+    setFilteredEvents(filtered);
     setIsModalOpen(true);
   };
 
@@ -146,6 +167,9 @@ function HomePage() {
 
   // Clear date filter
   const clearDateFilter = () => {
+    // setSelectedCategories([]);
+    // setFilteredEvents(alleventsData);
+    handleSearchEvents();
     setSelectedDate("");
   };
 
@@ -265,7 +289,7 @@ function HomePage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="z-20">
                   <MultiSelect
-                    options={categoryOptions}
+                    options={categories}
                     value={selectedCategories}
                     placeholder="Select categories"
                     className="w-full text-black"
@@ -364,7 +388,11 @@ function HomePage() {
                 ))}
               </div>
               <div className="text-center m-12">
-                <Button size="lg" className="bg-purple-600">
+                <Button
+                  size="lg"
+                  className="bg-purple-600"
+                  onClick={handleBrowseEvents}
+                >
                   View All Events
                 </Button>
               </div>
@@ -392,24 +420,6 @@ function HomePage() {
                 <p className="opacity-80">{item.description}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Newsletter Section */}
-      <section className="py-16 px-4">
-        <div className="container mx-auto max-w-3xl text-center">
-          <h2 className="text-3xl font-bold mb-4">Stay Updated</h2>
-          <p className="text-gray-600 mb-8">
-            Subscribe to our newsletter for the latest events and exclusive
-            offers
-          </p>
-
-          <div className="flex flex-col md:flex-row gap-4">
-            <Input placeholder="Your email address" className="flex-grow" />
-            <Button className="bg-gradient-to-r from-purple-600 to-pink-500 text-white">
-              Subscribe
-            </Button>
           </div>
         </div>
       </section>
@@ -524,7 +534,7 @@ function HomePage() {
                   Categories
                 </label>
                 <MultiSelect
-                  options={categoryOptions}
+                  options={categories}
                   value={selectedCategories}
                   placeholder="Select categories"
                   className="w-full text-black"
@@ -564,6 +574,7 @@ function HomePage() {
             <div className="mt-3 flex justify-end">
               <Button
                 onClick={() => {
+                  setFilteredEvents(alleventsData);
                   setSelectedCategories([]);
                   setSelectedDate("");
                   setSelectedLocation("");
@@ -583,6 +594,7 @@ function HomePage() {
           </div>
 
           {/* Active filters display */}
+
           {(selectedCategories.length > 0 ||
             selectedDate ||
             selectedLocation) && (
@@ -593,10 +605,7 @@ function HomePage() {
                   className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full flex items-center text-sm"
                 >
                   <span>
-                    {
-                      categoryOptions.find((option) => option.value === cat)
-                        ?.label
-                    }
+                    {categories.find((option) => option.value === cat)?.label}
                   </span>
                   <button className="ml-2" onClick={() => removeCategory(cat)}>
                     <FiX size={16} />
